@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CardioVision — Cardiovascular Risk Visualization</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #070b12;
+      --bg-elev: #0d1522;
+      --line: rgba(120, 190, 255, 0.14);
+      --text: #e8f1ff;
+      --muted: #8aa0bb;
+      --cyan: #3ee0ff;
+      --cyan-dim: rgba(62, 224, 255, 0.16);
+      --high: #ff3333;
+      --low: #33ff77;
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: radial-gradient(1200px 600px at 80% -10%, #12304a 0%, transparent 55%),
+                  radial-gradient(900px 500px at -10% 110%, #1a2040 0%, transparent 50%),
+                  var(--bg);
+      color: var(--text);
+      font-family: "IBM Plex Sans", system-ui, sans-serif;
+    }
+    body { display: flex; flex-direction: column; min-height: 100vh; }
+    header.app-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 22px; border-bottom: 1px solid var(--line);
+      background: rgba(7, 11, 18, 0.78); backdrop-filter: blur(12px);
+      position: sticky; top: 0; z-index: 20;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .logo {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(145deg, #3ee0ff, #2b6cff);
+      display: grid; place-items: center; font-weight: 700; color: #041018;
+      box-shadow: 0 0 24px rgba(62, 224, 255, 0.35);
+    }
+    .brand h1 { font-size: 16px; letter-spacing: 0.04em; }
+    .brand p { font-size: 11px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+    .header-meta { display: flex; gap: 10px; font-size: 12px; color: var(--muted); }
+    .pill {
+      border: 1px solid var(--line); background: var(--bg-elev);
+      border-radius: 999px; padding: 6px 10px; font-family: "IBM Plex Mono", monospace;
+    }
+    .layout {
+      flex: 1; display: grid; grid-template-columns: 40% 60%;
+      gap: 18px; padding: 18px 22px 76px; min-height: 0; width: 100%;
+    }
+    .col { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+    .col-left { overflow-y: auto; }
+    .card {
+      background: linear-gradient(180deg, rgba(17, 28, 44, 0.92), rgba(13, 21, 34, 0.92));
+      border: 1px solid var(--line); border-radius: var(--radius); padding: 18px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+    }
+    .card h2 {
+      font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--cyan); margin-bottom: 14px;
+    }
+    form.vitals { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field.full { grid-column: 1 / -1; }
+    label { font-size: 11px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+    input, select {
+      width: 100%; background: #0a1220; border: 1px solid var(--line); color: var(--text);
+      border-radius: 10px; padding: 10px 12px; font: 500 14px "IBM Plex Sans", sans-serif; outline: none;
+    }
+    input:focus, select:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px var(--cyan-dim); }
+    .run-btn {
+      grid-column: 1 / -1; margin-top: 6px; border: 0; cursor: pointer; border-radius: 12px;
+      padding: 14px 16px; font: 700 15px "IBM Plex Sans", sans-serif; color: #041018;
+      background: linear-gradient(90deg, #2b8cff, #3ee0ff);
+      box-shadow: 0 10px 30px rgba(43, 140, 255, 0.32);
+    }
+    .run-btn:hover { filter: brightness(1.08); }
+    .run-btn:disabled { opacity: 0.65; cursor: wait; }
+    .placeholder { color: var(--muted); font-size: 14px; line-height: 1.6; }
+    .error {
+      color: var(--high); background: rgba(255, 51, 51, 0.08);
+      border: 1px solid rgba(255, 51, 51, 0.3); padding: 10px 12px;
+      border-radius: 10px; font-size: 13px; margin-bottom: 12px;
+    }
+    .overall {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 14px; border-radius: 12px; background: #0a1422; border: 1px solid var(--line); margin-bottom: 14px;
+    }
+    .overall.high { border-color: rgba(255, 51, 51, 0.45); }
+    .overall.low { border-color: rgba(51, 255, 119, 0.35); }
+    .overall h3 { font-size: 22px; }
+    .overall .score { font-family: "IBM Plex Mono", monospace; font-size: 28px; }
+    .artery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+    .artery-card { background: #0a1422; border: 1px solid var(--line); border-radius: 12px; padding: 12px; cursor: pointer; }
+    .artery-card .name { font-size: 12px; color: var(--muted); }
+    .artery-card .pct { font-family: "IBM Plex Mono", monospace; font-size: 18px; margin: 6px 0; }
+    .badge {
+      display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+      padding: 4px 7px; border-radius: 999px;
+    }
+    .badge.high { background: rgba(255, 51, 51, 0.18); color: var(--high); }
+    .badge.low { background: rgba(51, 255, 119, 0.14); color: var(--low); }
+    .factors { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .factor { display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: 13px; }
+    .bar { grid-column: 1 / -1; height: 6px; background: #1b2a3e; border-radius: 99px; overflow: hidden; }
+    .bar > span {
+      display: block; height: 100%; width: 0;
+      background: linear-gradient(90deg, #3ee0ff, #ff6b6b); transition: width 0.8s ease;
+    }
+    .viewport { position: relative; flex: 1; min-height: 560px; overflow: hidden; padding: 0; }
+    #heart-canvas { width: 100%; height: 100%; display: block; }
+    .overlay {
+      position: absolute; top: 14px; left: 14px; right: 14px;
+      display: flex; justify-content: space-between; align-items: flex-start;
+      flex-wrap: wrap; gap: 8px; pointer-events: none;
+    }
+    .overlay .legend, .overlay .hint {
+      pointer-events: auto; background: rgba(7, 11, 18, 0.72);
+      border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; backdrop-filter: blur(8px);
+    }
+    .legend h3, .hint h3 {
+      font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 8px;
+    }
+    .swatch { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 4px 0; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .hint p { font-size: 12px; color: var(--muted); max-width: 220px; line-height: 1.45; }
+    #vessel-popup {
+      position: absolute; right: 16px; bottom: 16px; width: min(320px, calc(100% - 32px));
+      background: rgba(8, 16, 28, 0.94); border: 1px solid var(--line); border-radius: 14px;
+      padding: 14px 16px; backdrop-filter: blur(10px); z-index: 5; display: none;
+    }
+    #vessel-popup.open { display: block; }
+    #vessel-popup header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    #vessel-popup h3 { font-size: 16px; }
+    #popup-close {
+      background: transparent; border: 0; color: var(--muted); font-size: 18px; cursor: pointer;
+    }
+    #popup-body { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    #vessel-badges { position: absolute; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; }
+    .vessel-badge {
+      position: absolute; left: 0; top: 0; pointer-events: auto; cursor: pointer;
+      border: 1px solid rgba(158, 203, 255, 0.45); background: rgba(8, 17, 28, 0.86);
+      color: #e8f1ff; font: 700 11px "IBM Plex Sans", sans-serif; letter-spacing: 0.08em;
+      padding: 5px 8px; border-radius: 8px; white-space: nowrap;
+    }
+    .vessel-badge[data-vessel="LAD"] { border-color: #7aa7ff; }
+    .vessel-badge[data-vessel="LCX"] { border-color: #c084fc; }
+    .vessel-badge[data-vessel="RCA"] { border-color: #fbbf24; }
+    .disclaimer {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+      background: #120b0b; color: #f3c6c6; border-top: 1px solid rgba(255, 80, 80, 0.35);
+      padding: 10px 18px; font-size: 12px; text-align: center;
+    }
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 1fr; height: auto; flex: 0 0 auto; padding-bottom: 92px; }
+      .col-left { overflow: visible; }
+      .viewport { min-height: 480px; height: 70vh; }
+      .artery-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <div class="logo">CV</div>
+      <div>
+        <h1>CardioVision</h1>
+        <p>Track A · Cardiovascular Risk Visualization</p>
+      </div>
+    </div>
+    <div class="header-meta">
+      <span class="pill">POST /api/predict</span>
+      <span class="pill">localhost:8080</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="col col-left">
+      <article class="card">
+        <h2>Patient Vitals</h2>
+        <form class="vitals" id="vitals-form">
+          <div class="field">
+            <label for="age">Age (years)</label>
+            <input id="age" type="number" min="18" max="100" value="58" required />
+          </div>
+          <div class="field">
+            <label for="sex">Sex</label>
+            <select id="sex">
+              <option value="1" selected>Male</option>
+              <option value="0">Female</option>
+            </select>
+          </div>
+          <div class="field full">
+            <label for="cp">Chest Pain Type</label>
+            <select id="cp">
+              <option value="typical" selected>Typical</option>
+              <option value="atypical">Atypical</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="bp">Blood Pressure (mmHg)</label>
+            <input id="bp" type="number" min="70" max="250" value="140" required />
+          </div>
+          <div class="field">
+            <label for="chol">Cholesterol (mg/dL)</label>
+            <input id="chol" type="number" min="80" max="500" value="245" required />
+          </div>
+          <div class="field">
+            <label for="hr">Heart Rate (bpm)</label>
+            <input id="hr" type="number" min="40" max="220" value="150" required />
+          </div>
+          <div class="field">
+            <label for="st">ST Elevation</label>
+            <input id="st" type="number" min="0" max="10" step="0.1" value="1.2" required />
+          </div>
+          <button class="run-btn" id="run-btn" type="submit">Run CardioVision AI Analysis</button>
+        </form>
+      </article>
+
+      <article class="card">
+        <h2>Clinical Results &amp; Interpretability</h2>
+        <div class="error" id="api-error" hidden></div>
+        <p class="placeholder" id="results-placeholder">
+          Submit sample vitals to generate overall CAD risk, coronary artery scores
+          (LAD, LCX, RCA), and top contributing physiological drivers.
+        </p>
+        <div id="results-body" hidden>
+          <div class="overall" id="overall-card">
+            <div>
+              <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Overall CAD Risk</div>
+              <h3 id="overall-status">—</h3>
+            </div>
+            <div class="score" id="overall-score">--%</div>
+          </div>
+          <div class="artery-grid" id="artery-cards"></div>
+          <h2>Clinical Interpretability (SHAP)</h2>
+          <ul class="factors" id="factor-list"></ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="col">
+      <article class="card viewport">
+        <canvas id="heart-canvas"></canvas>
+        <div id="vessel-badges">
+          <button type="button" class="vessel-badge" data-vessel="LAD" id="badge-LAD">LAD</button>
+          <button type="button" class="vessel-badge" data-vessel="LCX" id="badge-LCX">LCX</button>
+          <button type="button" class="vessel-badge" data-vessel="RCA" id="badge-RCA">RCA</button>
+        </div>
+        <div class="overlay">
+          <div class="legend">
+            <h3>Territory Legend</h3>
+            <div class="swatch"><span class="dot" style="background:#7aa7ff"></span> LAD · Left Anterior Descending</div>
+            <div class="swatch"><span class="dot" style="background:#c084fc"></span> LCX · Left Circumflex</div>
+            <div class="swatch"><span class="dot" style="background:#fbbf24"></span> RCA · Right Coronary Artery</div>
+            <div class="swatch"><span class="dot" style="background:#ff3333"></span> High risk (≥50%)</div>
+            <div class="swatch"><span class="dot" style="background:#33ff77"></span> Low risk (&lt;50%)</div>
+          </div>
+          <div class="hint">
+            <h3>Inspection</h3>
+            <p>Drag to rotate, scroll to zoom. Click a coronary tube to inspect vessel risk.</p>
+          </div>
+        </div>
+        <div id="vessel-popup">
+          <header>
+            <h3 id="popup-name">Vessel</h3>
+            <button type="button" id="popup-close" aria-label="Close">×</button>
+          </header>
+          <div id="popup-status"></div>
+          <p id="popup-body"></p>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <footer class="disclaimer">
+    DISCLAIMER: For educational and clinical decision-support purposes only. Not a substitute for formal diagnostic imaging or cardiac catheterization.
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script>
+    (function () {
+      const API_URL = "http://localhost:8080/api/predict";
+      const RISK_HIGH = "#FF3333";
+      const RISK_LOW = "#33FF77";
+      const FEATURE_LABELS = {
+        Age: "Age", Sex: "Sex", BP: "Blood pressure", PR: "Heart rate",
+        LDL: "Cholesterol", HDL: "HDL cholesterol", TG: "Triglycerides",
+        "Typical Chest Pain": "Typical chest pain", Atypical: "Atypical chest pain",
+        "St Elevation": "ST elevation", HTN: "Hypertension", DM: "Diabetes mellitus",
+        FBS: "Fasting blood sugar", "EF-TTE": "Ejection fraction (TTE)",
+        "Current Smoker": "Current smoker", BMI: "BMI", Weight: "Weight",
+        "Region RWMA": "Regional wall-motion abnormality"
+      };
+      const VESSEL_META = {
+        LAD: { title: "LAD — Left Anterior Descending", groove: "Anterior interventricular sulcus (front)." },
+        LCX: { title: "LCX — Left Circumflex", groove: "Left atrioventricular groove wrapping posteriorly." },
+        RCA: { title: "RCA — Right Coronary Artery", groove: "Right atrioventricular sulcus." }
+      };
+
+      const form = document.getElementById("vitals-form");
+      const runBtn = document.getElementById("run-btn");
+      const resultsBody = document.getElementById("results-body");
+      const resultsPlaceholder = document.getElementById("results-placeholder");
+      const apiError = document.getElementById("api-error");
+      const popup = document.getElementById("vessel-popup");
+      let lastPrediction = null;
+
+      form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        runBtn.disabled = true;
+        runBtn.textContent = "Analyzing coronary risk…";
+        try {
+          const response = await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(buildPayload())
+          });
+          if (!response.ok) throw new Error("Backend returned HTTP " + response.status);
+          const data = await response.json();
+          lastPrediction = data;
+          renderResults(data);
+          updateVesselMaterials(data.arteries || {});
+        } catch (error) {
+          showError(error.message);
+        } finally {
+          runBtn.disabled = false;
+          runBtn.textContent = "Run CardioVision AI Analysis";
+        }
+      });
+
+      function buildPayload() {
+        const cp = document.getElementById("cp").value;
+        const chol = Number(document.getElementById("chol").value);
+        const hr = Number(document.getElementById("hr").value);
+        return {
+          Age: Number(document.getElementById("age").value),
+          Sex: Number(document.getElementById("sex").value),
+          "Typical Chest Pain": cp === "typical" ? 1 : 0,
+          Atypical: cp === "atypical" ? 1 : 0,
+          BP: Number(document.getElementById("bp").value),
+          Cholesterol: chol,
+          LDL: chol,
+          HR: hr,
+          PR: hr,
+          "St Elevation": Number(document.getElementById("st").value)
+        };
+      }
+
+      function showError(message) {
+        resultsPlaceholder.hidden = true;
+        resultsBody.hidden = true;
+        apiError.hidden = false;
+        apiError.textContent = "Could not reach CardioVision backend (" + message + "). Confirm Spring Boot is running on port 8080 and the FastAPI ML server is on port 8000.";
+      }
+
+      function isHigh(item) {
+        if (!item) return false;
+        if (String(item.status || "").indexOf("HIGH") !== -1) return true;
+        return Number(item.probability) >= 50;
+      }
+
+      function renderResults(data) {
+        apiError.hidden = true;
+        resultsPlaceholder.hidden = true;
+        resultsBody.hidden = false;
+        const overall = data.overallCAD || {};
+        const high = isHigh(overall);
+        const status = String(overall.status || "UNKNOWN").replace("_", " ");
+        const overallCard = document.getElementById("overall-card");
+        overallCard.className = "overall " + (high ? "high" : "low");
+        document.getElementById("overall-status").textContent = status;
+        document.getElementById("overall-status").style.color = high ? RISK_HIGH : RISK_LOW;
+        document.getElementById("overall-score").textContent = Number(overall.probability || 0).toFixed(1) + "%";
+        document.getElementById("overall-score").style.color = high ? RISK_HIGH : RISK_LOW;
+
+        const arteries = data.arteries || {};
+        document.getElementById("artery-cards").innerHTML = ["LAD", "LCX", "RCA"].map(function (key) {
+          const item = arteries[key] || {};
+          const vesselHigh = isHigh(item);
+          return '<div class="artery-card" data-vessel="' + key + '">' +
+            '<div class="name">' + key + "</div>" +
+            '<div class="pct" style="color:' + (vesselHigh ? RISK_HIGH : RISK_LOW) + '">' +
+            Number(item.probability || 0).toFixed(1) + "%</div>" +
+            '<span class="badge ' + (vesselHigh ? "high" : "low") + '">' +
+            (vesselHigh ? "HIGH RISK" : "LOW RISK") + "</span></div>";
+        }).join("");
+
+        document.querySelectorAll(".artery-card").forEach(function (card) {
+          card.addEventListener("click", function () {
+            inspectVessel(card.getAttribute("data-vessel"));
+          });
+        });
+
+        const factorSource = overall.topRiskFactors || (arteries.LAD && arteries.LAD.topRiskFactors) || {};
+        const entries = Object.keys(factorSource).map(function (name) {
+          return [name, Number(factorSource[name])];
+        }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 5);
+        const max = Math.max.apply(null, entries.map(function (e) { return e[1]; }).concat([0.0001]));
+        document.getElementById("factor-list").innerHTML = entries.length
+          ? entries.map(function (entry) {
+              const pct = Math.round((entry[1] / max) * 100);
+              return '<li class="factor"><span>' + (FEATURE_LABELS[entry[0]] || entry[0]) +
+                "</span><span>" + (entry[1] * 100).toFixed(1) + '%</span><div class="bar"><span style="width:' +
+                pct + '%"></span></div></li>';
+            }).join("")
+          : '<li class="placeholder">No interpretability factors returned.</li>';
+      }
+
+      /* ---------- Three.js r128 scene ---------- */
+      const canvas = document.getElementById("heart-canvas");
+      const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setClearColor(0x08111c, 1);
+
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.Fog(0x08111c, 8, 22);
+
+      const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 80);
+      camera.position.set(0.9, 1.6, 6.4);
+
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+      controls.minDistance = 3.4;
+      controls.maxDistance = 12;
+      controls.target.set(0, 0.15, 0);
+
+      renderer.outputEncoding = THREE.sRGBEncoding;
+
+      scene.add(new THREE.AmbientLight(0xc9d4e0, 0.58));
+      const keyLight = new THREE.DirectionalLight(0xfff2e6, 1.25);
+      keyLight.position.set(3.6, 5.4, 4.4);
+      scene.add(keyLight);
+      const fillLight = new THREE.DirectionalLight(0x9cc4ff, 0.62);
+      fillLight.position.set(-4.4, 1.6, -2.6);
+      scene.add(fillLight);
+      const specLight = new THREE.PointLight(0xffd0c4, 1.35, 16);
+      specLight.position.set(0.4, 2.2, 3.4);
+      scene.add(specLight);
+
+      const grid = new THREE.GridHelper(16, 24, 0x1b3a55, 0x122233);
+      grid.position.y = -2.35;
+      scene.add(grid);
+
+      const heartGroup = new THREE.Group();
+      scene.add(heartGroup);
+
+      function makeHeartMaterial(map) {
+        return new THREE.MeshStandardMaterial({
+          color: 0x8B1A1A,
+          map: map || null,
+          roughness: 0.28,
+          metalness: 0.28,
+          emissive: 0x3a080c,
+          emissiveIntensity: 0.16
+        });
+      }
+
+      function fitHeartModel(model) {
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        model.position.sub(center);
+        const maxDim = Math.max(size.x, size.y, size.z) || 1;
+        model.scale.setScalar(3.25 / maxDim);
+        const fitted = new THREE.Box3().setFromObject(model);
+        model.position.sub(fitted.getCenter(new THREE.Vector3()));
+      }
+
+      function applyHeartMaterial(root) {
+        root.traverse(function (child) {
+          if (!child.isMesh) return;
+          const map = child.material && child.material.map ? child.material.map : null;
+          child.material = makeHeartMaterial(map);
+        });
+      }
+
+      function addProceduralHeart() {
+        const mat = makeHeartMaterial();
+        const vesselMat = new THREE.MeshStandardMaterial({
+          color: 0x992222,
+          roughness: 0.35,
+          metalness: 0.1
+        });
+
+        const lvGeo = new THREE.SphereGeometry(1.1, 48, 36);
+        const lv = new THREE.Mesh(lvGeo, mat);
+        lv.scale.set(0.95, 1.35, 0.9);
+        lv.rotation.z = -0.18;
+        lv.position.set(-0.15, -0.2, 0);
+        heartGroup.add(lv);
+
+        const rvGeo = new THREE.SphereGeometry(0.88, 36, 28);
+        const rv = new THREE.Mesh(rvGeo, mat);
+        rv.scale.set(0.85, 1.15, 0.75);
+        rv.position.set(0.48, -0.1, 0.18);
+        heartGroup.add(rv);
+
+        const atriumGeo = new THREE.SphereGeometry(0.58, 32, 24);
+        const leftAtrium = new THREE.Mesh(atriumGeo, mat);
+        leftAtrium.position.set(-0.45, 0.95, -0.1);
+        heartGroup.add(leftAtrium);
+
+        const rightAtrium = new THREE.Mesh(atriumGeo, mat);
+        rightAtrium.position.set(0.35, 0.88, 0.02);
+        heartGroup.add(rightAtrium);
+
+        const aortaCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(-0.05, 0.75, 0),
+          new THREE.Vector3(-0.02, 1.45, -0.05),
+          new THREE.Vector3(-0.25, 1.72, -0.1),
+          new THREE.Vector3(-0.55, 1.48, -0.2)
+        ]);
+        const aortaGeo = new THREE.TubeGeometry(aortaCurve, 32, 0.22, 16, false);
+        const aorta = new THREE.Mesh(aortaGeo, vesselMat);
+        heartGroup.add(aorta);
+
+        const pulmCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0.12, 0.65, 0.22),
+          new THREE.Vector3(0.08, 1.25, 0.15),
+          new THREE.Vector3(-0.18, 1.38, -0.05)
+        ]);
+        const pulmGeo = new THREE.TubeGeometry(pulmCurve, 24, 0.18, 16, false);
+        const pulmMat = new THREE.MeshStandardMaterial({ color: 0x225588, roughness: 0.4 });
+        const pulm = new THREE.Mesh(pulmGeo, pulmMat);
+        heartGroup.add(pulm);
+      }
+
+      function placeGltfHeart(gltf) {
+        const model = gltf.scene;
+        
+        model.traverse(function (child) {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            if (child.material) {
+              child.material.needsUpdate = true;
+            }
+          }
+        });
+
+        fitHeartModel(model);
+        heartGroup.add(model);
+        console.log("✅ REALISTIC GLB HEART MODEL LOADED SUCCESSFULLY!");
+      }
+
+      const gltfLoader = new THREE.GLTFLoader();
+      
+      const glbFileName = "./human_heart_realistic_anatomical_model.glb";
+
+      gltfLoader.load(
+        glbFileName,
+        placeGltfHeart,
+        function (xhr) {
+          if (xhr.lengthComputable) {
+            const percent = (xhr.loaded / xhr.total) * 100;
+            console.log("Loading GLB Model: " + Math.round(percent) + "%");
+          }
+        },
+        function (error) {
+          console.error("❌ ERROR LOADING GLB FILE:", error);
+          console.warn("Falling back to procedural model. Please check file path & filename!");
+          addProceduralHeart();
+        }
+      );
+
+      function makeVessel(name, points, idleColor) {
+        const curve = new THREE.CatmullRomCurve3(points.map(function (p) {
+          return new THREE.Vector3(p[0], p[1], p[2]);
+        }));
+        const geometry = new THREE.TubeGeometry(curve, 64, 0.055, 12, false);
+        const material = new THREE.MeshStandardMaterial({
+          color: idleColor,
+          emissive: idleColor,
+          emissiveIntensity: 0.45,
+          roughness: 0.28,
+          metalness: 0.18
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.userData.vessel = name;
+        const glow = new THREE.PointLight(idleColor, 0.55, 2.8);
+        const mid = points[Math.floor(points.length / 2)];
+        glow.position.set(mid[0], mid[1], mid[2]);
+        mesh.add(glow);
+        const end = points[points.length - 1];
+        heartGroup.add(mesh);
+        return {
+          name: name, mesh: mesh, material: material, glow: glow,
+          highRisk: false, idleColor: idleColor,
+          focus: new THREE.Vector3(mid[0], mid[1], mid[2]),
+          label: new THREE.Vector3(end[0], end[1] + 0.32, end[2] + 0.18)
+        };
+      }
+
+      const VESSEL_HIGH = "#FF3333";
+      const VESSEL_LOW = "#33FF77";
+      const vessels = {
+        LAD: makeVessel("LAD", [
+          [-0.08, 1.15, 0.62], [0.02, 0.58, 0.98], [0.06, 0.02, 1.05],
+          [0.02, -0.62, 0.82], [-0.02, -1.28, 0.38]
+        ], 0x7aa7ff),
+        LCX: makeVessel("LCX", [
+          [-0.22, 1.12, 0.38], [-0.92, 0.68, 0.32], [-1.18, 0.22, -0.06],
+          [-0.98, -0.08, -0.62], [-0.48, -0.22, -0.92]
+        ], 0xc084fc),
+        RCA: makeVessel("RCA", [
+          [0.24, 1.1, 0.34], [0.92, 0.58, 0.3], [1.18, 0.06, 0.12],
+          [0.96, -0.52, 0.08], [0.52, -1.18, 0.16]
+        ], 0xfbbf24)
+      };
+      const vesselMeshes = [vessels.LAD.mesh, vessels.LCX.mesh, vessels.RCA.mesh];
+      let selectedVessel = null;
+      const badgeEls = {
+        LAD: document.getElementById("badge-LAD"),
+        LCX: document.getElementById("badge-LCX"),
+        RCA: document.getElementById("badge-RCA")
+      };
+      Object.keys(badgeEls).forEach(function (key) {
+        badgeEls[key].addEventListener("click", function (event) {
+          event.stopPropagation();
+          inspectVessel(key);
+        });
+      });
+
+      function updateVesselMaterials(arteries) {
+        Object.keys(vessels).forEach(function (key) {
+          const node = vessels[key];
+          const item = arteries[key];
+          if (!item) return;
+          const high = isHigh(item);
+          const color = new THREE.Color(high ? VESSEL_HIGH : VESSEL_LOW);
+          node.highRisk = high;
+          node.material.color.copy(color);
+          node.material.emissive.copy(color);
+          node.glow.color.copy(color);
+        });
+      }
+
+      const raycaster = new THREE.Raycaster();
+      const pointer = new THREE.Vector2();
+      let camAnim = null;
+
+      function inspectVessel(name) {
+        const node = vessels[name];
+        if (!node) return;
+        selectedVessel = name;
+        const focus = node.focus.clone();
+        heartGroup.localToWorld(focus);
+        const offset = new THREE.Vector3(1.35, 0.85, 2.15);
+        camAnim = {
+          fromCam: camera.position.clone(),
+          toCam: focus.clone().add(offset),
+          fromTarget: controls.target.clone(),
+          toTarget: focus,
+          t: 0
+        };
+        const item = lastPrediction && lastPrediction.arteries ? lastPrediction.arteries[name] : null;
+        const meta = VESSEL_META[name];
+        document.getElementById("popup-name").textContent = meta.title;
+        const statusEl = document.getElementById("popup-status");
+        const body = document.getElementById("popup-body");
+        if (item) {
+          const high = isHigh(item);
+          statusEl.innerHTML = '<span class="badge ' + (high ? "high" : "low") + '">' +
+            (high ? "HIGH RISK" : "LOW RISK") + "</span> &nbsp;" +
+            Number(item.probability || 0).toFixed(1) + "% stenosis probability";
+          const factors = item.topRiskFactors || {};
+          const top = Object.keys(factors).slice(0, 3).map(function (k) {
+            return FEATURE_LABELS[k] || k;
+          }).join(", ");
+          body.textContent = meta.groove + " Leading physiological drivers: " +
+            (top || "awaiting attribution") + ".";
+        } else {
+          statusEl.innerHTML = '<span class="badge">PENDING</span>';
+          body.textContent = meta.groove + " Run CardioVision AI Analysis to load vessel-specific risk and SHAP drivers.";
+        }
+        popup.classList.add("open");
+      }
+
+      renderer.domElement.addEventListener("pointerdown", function (event) {
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+        const hits = raycaster.intersectObjects(vesselMeshes, false);
+        if (hits.length) inspectVessel(hits[0].object.userData.vessel);
+      });
+
+      document.getElementById("popup-close").addEventListener("click", function () {
+        popup.classList.remove("open");
+      });
+
+      function resize() {
+        const parent = canvas.parentElement;
+        const w = parent.clientWidth;
+        const h = parent.clientHeight;
+        renderer.setSize(w, h, false);
+        camera.aspect = w / Math.max(h, 1);
+        camera.updateProjectionMatrix();
+      }
+      window.addEventListener("resize", resize);
+      resize();
+
+      const clock = new THREE.Clock();
+      function animate() {
+        requestAnimationFrame(animate);
+        const t = clock.getElapsedTime();
+        const beat = 1 + Math.sin(t * 6.4) * 0.028 + Math.max(0, Math.sin(t * 6.4)) * 0.02;
+        heartGroup.scale.set(beat, beat, beat);
+        heartGroup.position.y = Math.sin(t * 1.15) * 0.04;
+
+        Object.keys(vessels).forEach(function (key, index) {
+          const node = vessels[key];
+          const selected = selectedVessel === key;
+          if (node.highRisk) {
+            const pulse = 0.75 + (Math.sin(t * 5.5 + index) * 0.5 + 0.5) * 0.9;
+            node.material.emissiveIntensity = pulse + (selected ? 0.55 : 0);
+            node.glow.intensity = 0.7 + pulse + (selected ? 0.8 : 0);
+          } else {
+            node.material.emissiveIntensity = selected ? 1.15 : 0.45;
+            node.glow.intensity = selected ? 1.4 : 0.55;
+          }
+          node.mesh.scale.setScalar(selected ? 1.18 : 1);
+        });
+
+        if (camAnim) {
+          camAnim.t = Math.min(1, camAnim.t + 0.035);
+          const k = 1 - Math.pow(1 - camAnim.t, 3);
+          camera.position.lerpVectors(camAnim.fromCam, camAnim.toCam, k);
+          controls.target.lerpVectors(camAnim.fromTarget, camAnim.toTarget, k);
+          if (camAnim.t >= 1) camAnim = null;
+        }
+        controls.update();
+        renderer.render(scene, camera);
+
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+        Object.keys(vessels).forEach(function (key) {
+          const world = vessels[key].label.clone();
+          heartGroup.localToWorld(world);
+          world.project(camera);
+          const el = badgeEls[key];
+          if (world.z > 1) {
+            el.style.display = "none";
+            return;
+          }
+          el.style.display = "block";
+          const x = (world.x * 0.5 + 0.5) * width;
+          const y = (-world.y * 0.5 + 0.5) * height;
+          el.style.transform = "translate(" + x + "px," + y + "px) translate(-50%,-120%)";
+        });
+      }
+      animate();
+    })();
+  </script>
+</body>
+</html>
